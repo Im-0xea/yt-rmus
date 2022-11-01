@@ -1,0 +1,79 @@
+#!/bin/sh
+artist=""
+album=""
+loop=1
+nummax=2
+while [ "$loop" != "0" ]
+do
+	if [ "$#" -ne 3 ]; then
+		if [ "$artist" = "" ]; then
+			printf "Artist: "
+			read artist
+			if [ "$artist" = "" ]; then
+				break;
+			fi
+		fi
+		if [ "$album" = "" ]; then
+			printf "Album: "
+			read album
+			if [ "$album" = "" ]; then
+				artist=""
+				continue
+			fi
+		fi
+		while
+			printf "Title: "
+			read title
+			titles="$titles|$title"
+			nummax=$(( $nummax + 1 ))
+		([ "$title" != "" ])
+		do :; done
+		nummax=$(( $nummax - 1 ))
+	else
+		loop=0
+		num=$4
+		titles=$3
+		album=$2
+		artist=$1
+	fi
+	
+	mkdir -p "$artist/$album"
+	tn=2
+	while [[ $tn -ne $nummax ]]; do
+		tit="$(echo "$titles" | cut -d"|" -f${tn})"
+		sm=4
+		select=""
+		apn=""
+		while [[ $select = "" ]]; do
+			select=$(yt-dlp "ytsearch$sm:$artist ${tit}$apn" --get-id --get-title --get-duration | sed '/.\{100\}/d' 2> /dev/null | sed 'N;N;s/\n/ /g' 2> /dev/null | fzf)
+			sm=25
+			apn=" $album"
+		done
+		selectwithoutdur=$(echo $select | sed -e '1{s/[^ ]\+\s*$//}' 2> /dev/null)
+		codes="${codes}|${selectwithoutdur: -12}"
+		echo "$codes"
+		tn=$(( $tn + 1 ))
+	done
+	
+	tn=2
+	while [[ $tn -ne $nummax ]]; do
+		tf=2
+		tit="$(echo "$titles" | cut -d"|" -f${tn})"
+		while [[ $tf -ne $nummax ]]; do
+			if [ $tf = $tn ]; then
+				scode=$(printf "$codes" | cut -d"|" -f$tf)
+				break
+			fi
+			tf=$(( $tf + 1 ))
+		done
+		if [ "$scode" != "" ]; then
+		yt-dlp -x -f 'bestaudio' --audio-format vorbis -o "$artist"/"$album"/"${tit}.ogg" "http://youtu.be/$scode"
+		vorbiscomment -t "artist=$artist" -t "title=$tit" -t "album=$album" -t "tracknumber=$(( $tn - 1 ))" -w "$artist"/"$album"/"${tit}.ogg"
+		fi
+		tn=$(( $tn + 1 ))
+	done
+	album=""
+	titles=""
+	codes=""
+	nummax=2
+done
